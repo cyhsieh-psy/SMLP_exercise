@@ -1,8 +1,0 @@
-In this repo, the data were mostly derived from Chinese Lexicon Project of lexical decision (Tse et al., 2017) and naming (Tse et al., 2022) performance on traditional two-character compound words. Combining the two datasets, we try to replicate key findings of Tse et al. (2017, 2022) by comparing the difference between lexical decision and naming latencies. 
-
-
-
-References: 
-1. Tse, C. S., Yap, M. J., Chan, Y. L., Sze, W. P., Shaoul, C., & Lin, D. (2017). The Chinese Lexicon Project: A megastudy of lexical decision performance for 25,000+ traditional Chinese two-character compound words. Behavior Research Methods, 49, 1503-1519. https://doi.org/10.3758/s13428-016-0810-5
-
-2. Tse, C. S., Chan, Y. L., Yap, M. J., & Tsang, H. C. (2022). The Chinese Lexicon Project II: A megastudy of speeded naming performance for 25,000+ traditional Chinese two-character words. Behavior Research Methods, 1-21. https://doi.org/10.3758/s13428-022-02022-z (data available from https://osf.io/vwnps)
