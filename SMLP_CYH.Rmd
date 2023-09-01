@@ -91,7 +91,7 @@ df <- filter(df_raw,
              FSC_C2 > 0)
 
 # model specification
-model.word.RT <- lmer(RT_inv~scale(log(Subtlex_CD_W),scale=F)+
+model.word.RT <- lmer(zRT~scale(log(Subtlex_CD_W),scale=F)+
                         scale(log(neighborhood_C1),scale=F)+
                         scale(FSC_C1,scale=F)+
                         scale(nomeaning_C1,scale=F)+
