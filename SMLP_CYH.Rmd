@@ -29,8 +29,8 @@ df_raw <- read.csv(gh.link, sep = ",", header = TRUE)
 2. Corr: number of correct trials
 3. Err: number of incorrect trials
 4. Acc: accuracy of trials
-5. RT: reaction time of lexical decision (raw)
-6. zRT: reaction time of lexical decision (z-transformed)
+5. RT: Mean reaction time for each word computed across participants (raw)
+6. zRT: Mean of the standardized reaction time for each word computed across participants
 7. Subtlex_raw_W, Subtlex_raw_C1, Subtlex_raw_C2: raw frequency count of whole word, first character and second (derived from SUBTLEX-CH)
 8. Subtlex_CD_W, Subtlex_CD_C1, Subtlex_CD_C2: raw contextual diversity count of whole word, first character and second (derived from SUBTLEX)
 9. Google_freq_W, Google_freq_C1, Google_freq_C2: raw frequency count of whole word, first character and second (derived from Google)
