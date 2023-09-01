@@ -1,0 +1,189 @@
+---
+title: "Creating an Arrow IPC file from the Chinese Lexicon data"
+author: "Douglas Bates"
+format: html
+jupyter: julia-1.9
+bibliography: CLS.bib
+---
+
+# Introduction
+
+Cheng-Yu Hsieh has provided data from the Chinese Lexicon Project [@Tse2016] on his [SMLP_exercise repository]( https://github.com/cyhsieh-psy/SMLP_exercise) in a CSV file.
+The purpose of this note is to read this CSV file into Julia and write it out as an Arrow file that can then be read into Julia, R, Python, and several other data analysis software systems.
+
+# Attach the packages to be used
+
+```{julia}
+#| code-fold: true
+#| output: false
+using AlgebraOfGraphics
+using Arrow                  # read and write Arrow IPC files
+using CSV                    # comma-separated value and similar files
+using DataFrames             # dataframe implementation
+using MixedModels            # mixed-effects models
+using MixedModelsMakie
+using RCall                  # call R functions from within Julia
+using StandardizedPredictors # center, scale, zscore, etc.
+
+import CairoMakie
+CairoMakie.activate!(; type="svg")
+import ProgressMeter
+ProgressMeter.ijulia_behavior(:clear)
+```
+
+# Read the CSV file using explicit data types
+
+Most of the time we can let the `CSV.read` function determine the types for storing each of the columns automatically but occasionally it helps to specify specific types that provide more compact storage.
+If we are going to create a "reference" data table in Arrow IPC format it helps to do this to save on storage and data transmission costs.
+
+
+```{julia}
+csvnm = "Chinese_Lexicon_Project_SMLP.csv"
+dat = CSV.read(
+    csvnm,
+    DataFrame; 
+    drop = [1],   # drop the first column of 0-based row numbers
+    types = Dict(
+        :Corr => Int8,
+        :Err => Int8,
+        :Acc => Float32,
+        :RT => Float32,
+        :zRT => Float32,
+        :Subtlex_raw_C1 => Union{Missing, Int32},
+        :Subtlex_raw_C2 => Union{Missing, Int32},
+        :Subtlex_CD_C1 => Union{Missing, Int16},
+        :Subtlex_CD_C2 => Union{Missing, Int16},
+        :Google_freq_C1 => Int32,
+        :Google_freq_C2 => Int32,
+        :Subtlex_raw_W => Union{Missing, Int32},
+        :Subtlex_CD_W => Union{Missing, Int16},
+        :Google_freq_W => Int32,
+        :C1_ID => Int16,
+        :C2_ID => Int16,
+        :neighborhood_C1 => Int16,
+        :neighborhood_C2 => Int16,
+        :homophone_C1 => Int8,
+        :homophone_C2 => Int8,
+        :nomeaning_C1 => Int8,
+        :nomeaning_C2 => Int8,
+    )
+)
+```
+
+The `C1_ID` and `C2_ID` columns will be used as grouping factors for the random effects and should be flagged for Arrow dictencoding.
+To make it clearer that these are labels and not numbers we express each of these values as four-digit strings padded with zeros on the left.
+That is, they start at `0001`.
+This ensures that lexicographic sorting corresponds to numerical sorting.
+
+```{julia}
+#| output: false
+dat.C1_ID = Arrow.DictEncode(lpad.(dat.C1_ID, 4, '0'))
+dat.C2_ID = Arrow.DictEncode(lpad.(dat.C2_ID, 4, '0'))
+```
+
+Check a few summary statistics for each of the columns
+
+```{julia}
+describe(DataFrame(dat))
+```
+
+## Write the data to an Arrow IPC file
+
+```{julia}
+arrowfn = Arrow.write("Chinese_Lexicon_Project_SMLP.arrow", dat; compress=:zstd)
+filesize(arrowfn)   # the data file is now less than 1 MB in size
+```
+
+We can read this file into R
+
+```{julia}
+R"""
+dat <- arrow::read_ipc_file($arrowfn)   # pass the file name to R through string interpolation
+tibble::glimpse(dat)
+"""
+```
+
+or into Julia
+
+```{julia}
+#| output: false
+df = DataFrame(Arrow.Table(arrowfn))
+df.zRT1 = zscore(df.RT)     # recalculate a z-score for the response time
+```
+
+The `zRT` column in the CSV file does not match z-scores as calculated in Julia.
+It seems like the scaling is different from the sample standard deviation.
+
+```{julia}
+#| label: fig-scalingcomparison
+#| fig-cap: Comparative empirical density plots of the zRT column in the CSV file and the result of applying zscore from StandardizedPredictors.jl to the RT column
+#| code-fold: true
+draw(
+    data(df) *
+    mapping(
+        [:zRT, :zRT1] .=> "Z-scores of response time";
+        color=dims(1) => renamer(["CSV file", "calculated"])) *
+    density()
+)
+```
+
+We can check the sample standard deviations of the z-score columns, which should be unity.
+
+```{julia}
+@show std(df.zRT), std(df.zRT1);
+```
+
+A more suitable scale may be the inverse of the RT, which is the speed of the response
+
+```{julia}
+#| label: fig-speeddensity
+#| fig-cap: Empirical density plot of the speed of response
+#| code-fold: true
+draw(
+    data(df) *
+    mapping(:RT => (x -> 1000 ./ x) => "Speed of response (s⁻¹)") *
+    density()
+)
+```
+
+::: {.callout-note collapse="true"}
+### Standardizing the response
+
+Generally I don't think it is a good idea to standardize the response by subtracting the sample mean and scaling by the sample standard deviation because the Intercept term in the model should take care of an overall shift.
+Standardizing just introduces arbitrary units.
+:::
+
+```{julia}
+
+```
+
+## Fit preliminary models
+
+```{julia}
+mod1 = let f = @formula zRT1 ~ 
+        1 + log(Google_freq_C1) + log(Google_freq_C2) +
+        log(Google_freq_W) + (1|C1_ID) + (1|C2_ID)
+    fit(MixedModel, f, df)
+end
+println(mod1)
+```
+
+```{julia}
+qqcaterpillar(mod1)
+```
+
+On the speed scale
+
+```{julia}
+mod1a = let f = @formula 1000 / RT ~ 
+        1 + log(Google_freq_C1) + log(Google_freq_C2) +
+        log(Google_freq_W) + (1|C1_ID) + (1|C2_ID)
+    fit(MixedModel, f, df)
+end
+println(mod1a)
+```
+
+## References
+
+::: {#refs}
+:::

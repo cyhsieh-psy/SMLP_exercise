@@ -1,0 +1,5 @@
+/.quarto/
+*.arrow
+*.html
+Manifest.toml
+CL2arrow_files/
