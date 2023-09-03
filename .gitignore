@@ -3,3 +3,5 @@
 *.html
 Manifest.toml
 CL2arrow_files/
+GLMM_files/
+/.jupyter_cache/

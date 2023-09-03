@@ -1,0 +1,114 @@
+---
+title: "Fitting GLMMs to the Chinese lexicon data"
+author: "Douglas Bates"
+date: 2023-09-03
+format: html
+jupyter: julia-1.9
+execute:
+  cache: true
+  freeze: auto
+
+---
+
+## Load the packages to be used
+
+```{julia}
+#| code-fold: true
+#| output: false
+using AlgebraOfGraphics
+using AlgebraOfGraphics: density
+using Arrow
+using CairoMakie
+using DataFrames
+using MixedModels
+using StatsBase
+
+import ProgressMeter
+ProgressMeter.ijulia_behavior(:clear)
+CairoMakie.activate!(; type="svg")
+```
+
+## Read the Arrow file into a DataFrame
+
+Read the Arrow file and convert the `Arrow.Table` to a `DataFrame`.
+
+```{julia}
+df = DataFrame(Arrow.Table("./Chinese_Lexicon_Project_SMLP.arrow"))
+```
+
+## Select columns 
+
+Select the columns to be used in the model, calculate the total number of trials and recalculate the accuracy, then drop any rows with missing values.
+
+```{julia}
+trimmed = Table(
+    dropmissing!(
+        transform!(
+            select(
+                df, :word, :Corr, :Err,
+                [:Corr, :Err] => ((x, y) -> x .+ y) => :nTrials,
+                :C1_ID, :C2_ID, :Subtlex_CD_W,
+                :neighborhood_C1, :neighborhood_C2,
+                :nomeaning_C1, :nomeaning_C2,
+                :FSC_C1, :FSC_C2
+            ),
+            [:Corr, :nTrials] => ((x, y) -> x ./ y) => :Acc,
+        )
+    )
+)
+```
+
+The accuracy is generally very high - there was 100% accuracy on over 20% of the words
+
+```{julia}
+count(isone, trimmed.Acc) / length(trimmed.Acc)
+```
+
+This high accuracy is also shown in an empirical cumulative distribution plot, @fig-ecdfacc.
+
+```{julia}
+#| label: fig-ecdfacc
+#| fig-cap: "Empirical cumulative distribution plot of accuracy (:Acc) for words in the trimmed data set"
+#| code-fold: true
+let f = Figure(; resolution=(800, 350)),
+    ax = Axis(f[1,1]; xlabel="Accuracy", ylabel="Cumulative proportion")
+    lines!(ax, 0.0 .. 1.0, ecdf(trimmed.Acc))
+    f
+end
+```
+
+## Fit a GLMM
+
+Initially we set `fast=true` which provides a less accurate but, well, faster fit that is suitable for screening covariates.  
+
+```{julia}
+gm01f = let f = @formula Acc ~
+        1 + log(Subtlex_CD_W) +
+        log(neighborhood_C1) + FSC_C1 + nomeaning_C1 +
+        log(neighborhood_C2) + FSC_C2 + nomeaning_C2 +
+        (1 | C1_ID) + (1 | C2_ID)
+    wts = float(trimmed.nTrials)
+    fit(MixedModel, f, trimmed, Binomial(); wts, fast=true)
+end
+```
+
+```{julia}
+deviance(gm01f)
+```
+
+A fit with `fast=false` takes a couple of minutes for this model and converges to a much lower deviance.
+
+```{julia}
+gm01 = let f = @formula Acc ~
+        1 + log(Subtlex_CD_W) +
+        log(neighborhood_C1) + FSC_C1 + nomeaning_C1 +
+        log(neighborhood_C2) + FSC_C2 + nomeaning_C2 +
+        (1 | C1_ID) + (1 | C2_ID)
+    wts = float(trimmed.nTrials)
+    fit(MixedModel, f, trimmed, Binomial(); wts, fast=false)
+end
+```
+
+```{julia}
+deviance(gm01)
+```

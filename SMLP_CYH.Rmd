@@ -18,9 +18,9 @@ The data were mostly derived from Chinese Lexicon Project of lexical decision (T
 
 ```{r load data from github, echo=TRUE}
 
-gh.link <- "https://raw.githubusercontent.com/cyhsieh-psy/SMLP_exercise/main/Chinese_Lexicon_Project_SMLP.csv"
-df_raw <- read.csv(gh.link, sep = ",", header = TRUE)
-
+#gh.link <- "https://raw.githubusercontent.com/cyhsieh-psy/SMLP_exercise/main/Chinese_Lexicon_Project_SMLP.csv"
+#df_raw <- read.csv(gh.link, sep = ",", header = TRUE)
+df_raw <- arrow::read_ipc_file("./Chinese_Lexicon_Project_SMLP.arrow")
 ```
 
 ## Code book (of the relevant vaiables)
